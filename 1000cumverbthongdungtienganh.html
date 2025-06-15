@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>English Phrasal Verb Quiz</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    .question { font-size: 1.3em; font-weight: bold; margin-bottom: 20px; }
+    .answer { display: block; padding: 10px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 10px; cursor: pointer; text-align: left; background: white; }
+    .answer.disabled { cursor: default; opacity: 0.7; }
+    .details { font-size: 0.85em; color: #333; margin-top: 5px; white-space: pre-wrap; }
+    .example { font-style: italic; color: #555; display: block; margin-top: 5px; white-space: pre-wrap; }
+    #nextBtn { display: none; margin-top: 20px; padding: 10px 20px; font-size: 1em; }
+  </style>
+</head>
+<body>
+  <div class="question" id="questionText"></div>
+  <div id="answers"></div>
+  <button id="nextBtn">Next</button>
+
+  <script>
+    let questions = [];
+    let currentIndex = 0;
+
+    async function loadCSV() {
+      const res = await fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vTpisuN9LDHGOQr0oLxM3vMq_SYEWZz9XLF_UNBAguoxqo1OYOkPHZAMawW5QHOnBhmA9J0nc3Seakw/pub?gid=0&single=true&output=csv");
+      const text = await res.text();
+      const rows = text.trim().split("\n").slice(1);
+      questions = rows.map(row => {
+        const [phrase, ipa, viet, example] = row.split(",");
+        return { phrase, ipa, viet, example };
+      });
+      shuffle(questions);
+      showQuestion();
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    function showQuestion() {
+      const q = questions[currentIndex];
+      const container = document.getElementById("answers");
+      const questionText = document.getElementById("questionText");
+      const nextBtn = document.getElementById("nextBtn");
+      questionText.innerHTML = `Question: "${q.viet}"`;
+
+      let choices = [q];
+      const others = questions.filter((x, i) => i !== currentIndex);
+      shuffle(others);
+      choices.push(...others.slice(0, 3));
+      shuffle(choices);
+
+      container.innerHTML = "";
+      nextBtn.style.display = "none";
+
+      choices.forEach(choice => {
+        const btn = document.createElement("button");
+        btn.className = "answer";
+        btn.innerHTML = `<span>${choice.phrase}</span>`;
+        btn.onclick = () => {
+          if (document.querySelector('.answer.disabled')) {
+            const speak = new SpeechSynthesisUtterance(choice.phrase);
+            speak.lang = "en-US";
+            speechSynthesis.speak(speak);
+            return;
+          }
+
+          document.querySelectorAll('.answer').forEach(b => b.classList.add('disabled'));
+
+          if (choice === q) {
+            btn.style.background = '#cfc';
+          } else {
+            btn.style.background = '#fcc';
+          }
+
+          document.querySelectorAll('.answer').forEach(b => {
+            const text = b.querySelector('span').innerText;
+            const matched = choices.find(c => c.phrase === text);
+            if (matched) {
+              const detail = document.createElement("div");
+              detail.className = "details";
+              detail.innerText = matched.ipa;
+              const example = document.createElement("span");
+              example.className = "example";
+              example.innerText = matched.example;
+              b.appendChild(detail);
+              b.appendChild(example);
+
+              b.onclick = () => {
+                const speak = new SpeechSynthesisUtterance(matched.phrase);
+                speak.lang = "en-US";
+                speechSynthesis.speak(speak);
+              };
+            }
+          });
+
+          nextBtn.style.display = "block";
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    document.getElementById("nextBtn").onclick = () => {
+      currentIndex++;
+      if (currentIndex >= questions.length) currentIndex = 0;
+      showQuestion();
+    };
+
+    loadCSV();
+  </script>
+</body>
+</html>
